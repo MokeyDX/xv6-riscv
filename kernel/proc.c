@@ -1,4 +1,5 @@
 #include "types.h"
+#include "pstat.h"
 #include "param.h"
 #include "memlayout.h"
 #include "riscv.h"
@@ -413,6 +414,70 @@ kwait(uint64 addr)
 
     // Wait for a child to exit.
     sleep_prepare(p); //DOC: wait-sleep
+    release(&wait_lock);
+    sleep();
+    acquire(&wait_lock);
+  }
+}
+
+int
+kwait2(uint64 status_addr, uint64 rusage_addr)
+{
+  struct proc *pp;
+  int havekids, pid;
+  struct proc *p = myproc();
+  struct rusage usage;
+
+  acquire(&wait_lock);
+
+  for (;;) {
+    // Scan through table looking for exited children.
+    havekids = 0;
+    for (pp = proc; pp < &proc[NPROC]; pp++) {
+      if (pp->parent == p) {
+        // Make sure the child isn't still in exit() or swtch().
+        acquire(&pp->lock);
+
+        havekids = 1;
+        if (pp->state == ZOMBIE) {
+          // Found one.
+          pid = pp->pid;
+          usage.cputime = pp->cputime;
+
+          if (status_addr != 0 &&
+              copyout(p->pagetable, p->sz, status_addr,
+                      (char *)&pp->xstate, sizeof(pp->xstate)) < 0) {
+            release(&pp->lock);
+            release(&wait_lock);
+            return -1;
+          }
+
+          if (rusage_addr != 0 &&
+              copyout(p->pagetable, p->sz, rusage_addr,
+                      (char *)&usage, sizeof(usage)) < 0) {
+            release(&pp->lock);
+            release(&wait_lock);
+            return -1;
+          }
+
+          pp->parent = 0;
+          freeproc(pp);
+          release(&pp->lock);
+          release(&wait_lock);
+          return pid;
+        }
+        release(&pp->lock);
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if (!havekids || killed(p)) {
+      release(&wait_lock);
+      return -1;
+    }
+
+    // Wait for a child to exit.
+    sleep_prepare(p);
     release(&wait_lock);
     sleep();
     acquire(&wait_lock);
