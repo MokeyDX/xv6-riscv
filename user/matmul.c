@@ -17,9 +17,9 @@ int main(int argc, char **argv) {
   int a[ROWS][COLUMNS];
   int b[ROWS][COLUMNS];
   int c[ROWS][COLUMNS];
- 
+
   /* Start timing */
-  int start_time = uptime(); 
+  int start_time = uptime();
 
   iterations = 1;
   if (argc == 2)
@@ -35,9 +35,9 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (ROWS<10) 
+  if (ROWS<10)
   {
-    /* TEST PRINT */  
+    /* TEST PRINT */
     for (i=0; i<ROWS; i++) {
       for (j=0; j<COLUMNS; j++) {
         printf("%d ", a[i][j]);
@@ -61,8 +61,8 @@ int main(int argc, char **argv) {
     printf("\n");
   }
 
-  /* 
-    Multiply Matrices 
+  /*
+    Multiply Matrices
     (SQUARE)
   */
   for (i=0; i<ROWS; i++) {
