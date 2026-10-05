@@ -131,3 +131,33 @@ sys_getprocs(void)
   argaddr(0, &address);
   return getprocs(address);
 }
+
+// Return the current process's base priority.
+uint64
+sys_getpriority(void)
+{
+  struct proc *p = myproc();
+  int value;
+
+  acquire(&p->lock);
+  value = p->priority;
+  release(&p->lock);
+  return value;
+}
+
+// Set the current process's base priority within the allowed range.
+uint64
+sys_setpriority(void)
+{
+  struct proc *p = myproc();
+  int value;
+
+  argint(0, &value);
+  if (value < MINPRIORITY || value > MAXPRIORITY)
+    return -1;
+
+  acquire(&p->lock);
+  p->priority = value;
+  release(&p->lock);
+  return 0;
+}

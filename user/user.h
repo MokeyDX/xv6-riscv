@@ -10,6 +10,8 @@ int exit(int) __attribute__((noreturn));
 int wait(int *);
 int wait2(int *, struct rusage *);
 int getprocs(struct pstat *); // Read active processes.
+int getpriority(void); // Read the current process priority.
+int setpriority(int); // Set the current process priority.
 int pipe(int *);
 int write(int, const void *, int);
 int read(int, void *, int);

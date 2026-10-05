@@ -29,11 +29,11 @@ main(void)
     exit(1);
   }
 
-  printf("pid\tstate\t\tsize\tppid\tname\n");
+  printf("pid\tstate\t\tsize\tpriority\tppid\tname\n");
   for (int i = 0; i < count; i++) {
-    printf("%d\t%s\t%lu\t%d\t%s\n",
+    printf("%d\t%s\t%lu\t%d\t%d\t%s\n",
            processes[i].pid, state_name(processes[i].state),
-           processes[i].size, processes[i].ppid, processes[i].name);
+           processes[i].size, processes[i].priority, processes[i].ppid, processes[i].name);
   }
 
   exit(0);

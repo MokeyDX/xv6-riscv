@@ -126,6 +126,7 @@ found:
   p->pid = allocpid();
   p->state = USED;
   p->cputime = 0;
+  p->priority = 0; // Initialize the default priority.
 
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0) {
@@ -276,6 +277,7 @@ kfork(void)
     return -1;
   }
   np->sz = p->sz;
+  np->priority = p->priority; // Children inherit their parent priority.
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
@@ -792,6 +794,7 @@ getprocs(uint64 address)
     record.pid = p->pid;
     record.state = p->state;
     record.size = p->sz;
+    record.priority = p->priority; // Include the base priority.
     record.ppid = p->parent ? p->parent->pid : 0;
     safestrcpy(record.name, p->name, sizeof(record.name));
     release(&p->lock);
