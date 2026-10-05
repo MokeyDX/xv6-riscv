@@ -99,6 +99,7 @@ void            sleep(void);
 void            userinit(void);
 int             kwait(uint64);
 int             kwait2(uint64, uint64);
+int             getprocs(uint64); // Copy active process snapshots.
 void            wakeup(void*);
 void            yield(void);
 int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);

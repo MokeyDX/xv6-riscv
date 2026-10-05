@@ -121,3 +121,13 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// Return active process snapshots through the supplied user buffer.
+uint64
+sys_getprocs(void)
+{
+  uint64 address;
+
+  argaddr(0, &address);
+  return getprocs(address);
+}

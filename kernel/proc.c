@@ -765,3 +765,45 @@ procdump(void)
     printk("\n");
   }
 }
+// Copy active process records to a user buffer and return their count.
+int
+getprocs(uint64 address)
+{
+  struct proc *caller = myproc();
+  struct proc *p;
+  struct pstat record;
+  int count = 0;
+
+  // The interface requires room for at most NPROC records.
+  if (address >= caller->sz ||
+      caller->sz - address < NPROC * sizeof(record))
+    return -1;
+
+  for (p = proc; p < &proc[NPROC]; p++) {
+    // wait_lock protects the parent pointer; p->lock protects process fields.
+    acquire(&wait_lock);
+    acquire(&p->lock);
+    if (p->state == UNUSED || p->state == USED) {
+      release(&p->lock);
+      release(&wait_lock);
+      continue;
+    }
+
+    record.pid = p->pid;
+    record.state = p->state;
+    record.size = p->sz;
+    record.ppid = p->parent ? p->parent->pid : 0;
+    safestrcpy(record.name, p->name, sizeof(record.name));
+    release(&p->lock);
+    release(&wait_lock);
+
+    // Copy after releasing spinlocks because copyout may fault in a page.
+    if (copyout(caller->pagetable, caller->sz,
+                address + count * sizeof(record),
+                (char *)&record, sizeof(record)) < 0)
+      return -1;
+    count++;
+  }
+
+  return count;
+}
