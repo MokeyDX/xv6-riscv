@@ -10,6 +10,7 @@ struct pstat {
   enum procstate state;  // Process state.
   uint64 size;           // Process memory size in bytes.
   int priority;         // Base process priority.
+  uint readytime;        // Tick when the process became runnable.
   int ppid;              // Parent process ID.
   char name[16];         // Process command name.
 };

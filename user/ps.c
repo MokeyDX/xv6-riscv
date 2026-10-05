@@ -29,11 +29,20 @@ main(void)
     exit(1);
   }
 
-  printf("pid\tstate\t\tsize\tpriority\tppid\tname\n");
+  // Take one clock sample so all listed ages use the same reference.
+  uint now = uptime();
+
+  printf("pid\tstate\t\tsize\tage\tpriority\tppid\tname\n");
   for (int i = 0; i < count; i++) {
-    printf("%d\t%s\t%lu\t%d\t%d\t%s\n",
+    printf("%d\t%s\t%lu\t",
            processes[i].pid, state_name(processes[i].state),
-           processes[i].size, processes[i].priority, processes[i].ppid, processes[i].name);
+           processes[i].size);
+    if (processes[i].state == RUNNABLE)
+      printf("%u", now - processes[i].readytime);
+    else
+      printf("-");
+    printf("\t%d\t%d\t%s\n",
+           processes[i].priority, processes[i].ppid, processes[i].name);
   }
 
   exit(0);

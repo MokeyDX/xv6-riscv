@@ -18,6 +18,7 @@ struct spinlock pid_lock;
 
 extern void forkret(void);
 static void freeproc(struct proc *p);
+static void make_runnable(struct proc *p); // Timestamp runnable transitions.
 
 extern char trampoline[]; // trampoline.S
 
@@ -127,6 +128,7 @@ found:
   p->state = USED;
   p->cputime = 0;
   p->priority = 0; // Initialize the default priority.
+  p->readytime = 0; // No ready-queue entry exists yet.
 
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0) {
@@ -228,7 +230,7 @@ userinit(void)
 
   p->cwd = namei("/");
 
-  p->state = RUNNABLE;
+  make_runnable(p);
 
   release(&p->lock);
 }
@@ -302,7 +304,7 @@ kfork(void)
   release(&wait_lock);
 
   acquire(&np->lock);
-  np->state = RUNNABLE;
+  make_runnable(np);
   release(&np->lock);
 
   return pid;
@@ -570,7 +572,7 @@ yield(void)
 {
   struct proc *p = myproc();
   acquire(&p->lock);
-  p->state = RUNNABLE;
+  make_runnable(p);
   sched();
   release(&p->lock);
 }
@@ -656,7 +658,7 @@ wakeup(void *chan)
       // If this waiting process has gotten so far as to actually
       // go to sleep, also set it back to RUNNING.
       if (p->state == SLEEPING) {
-        p->state = RUNNABLE;
+        make_runnable(p);
       }
     }
     release(&p->lock);
@@ -677,7 +679,7 @@ kkill(int pid)
       p->killed = 1;
       if (p->state == SLEEPING) {
         // Wake process from sleep().
-        p->state = RUNNABLE;
+        make_runnable(p);
       }
       release(&p->lock);
       return 0;
@@ -795,6 +797,7 @@ getprocs(uint64 address)
     record.state = p->state;
     record.size = p->sz;
     record.priority = p->priority; // Include the base priority.
+    record.readytime = p->readytime; // Include the ready-queue timestamp.
     record.ppid = p->parent ? p->parent->pid : 0;
     safestrcpy(record.name, p->name, sizeof(record.name));
     release(&p->lock);
@@ -809,4 +812,13 @@ getprocs(uint64 address)
   }
 
   return count;
+}
+
+// Mark a process runnable and record when its ready-queue wait begins.
+static void
+make_runnable(struct proc *p)
+{
+  // The caller holds p->lock; tickslock may already be held by wakeup's caller.
+  p->readytime = ticks;
+  p->state = RUNNABLE;
 }
