@@ -1,9 +1,11 @@
 #define NPROC       64                // maximum number of processes
 #define MINPRIORITY 0 // Minimum base priority.
 #define MAXPRIORITY 49 // Maximum base priority.
+#define MAXEFFPRIORITY 99 // Cap effective priority after aging.
 #define SCHED_RR 0 // Run runnable processes in table order.
 #define SCHED_PRIORITY 1 // Select the highest base priority.
-#define SCHED_POLICY SCHED_PRIORITY // Compile-time scheduler selection.
+#define SCHED_AGING 2 // Select aged effective priority.
+#define SCHED_POLICY SCHED_AGING // Compile-time scheduler selection.
 #define NCPU        8                 // maximum number of CPUs
 #define NOFILE      16                // open files per process
 #define NFILE       100               // open files per system

@@ -524,16 +524,27 @@ scheduler(void)
     intr_off();
 
     int found = 0;
-#if SCHED_POLICY == SCHED_PRIORITY
+#if SCHED_POLICY == SCHED_PRIORITY || SCHED_POLICY == SCHED_AGING
     struct proc *best = 0;
     int bestpriority = MINPRIORITY - 1;
 
     // Inspect each candidate while holding its process lock.
     for (p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if (p->state == RUNNABLE && p->priority > bestpriority) {
-        best = p;
-        bestpriority = p->priority;
+      if (p->state == RUNNABLE) {
+        int candidatepriority = p->priority;
+#if SCHED_POLICY == SCHED_AGING
+        // Increase priority by runnable waiting time without exceeding the cap.
+        uint age = ticks - p->readytime;
+        if (age >= MAXEFFPRIORITY - candidatepriority)
+          candidatepriority = MAXEFFPRIORITY;
+        else
+          candidatepriority += age;
+#endif
+        if (candidatepriority > bestpriority) {
+          best = p;
+          bestpriority = candidatepriority;
+        }
       }
       release(&p->lock);
     }
