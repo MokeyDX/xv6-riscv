@@ -1,5 +1,6 @@
 // Shell.
 
+#include "kernel/param.h"
 #include "kernel/types.h"
 #include "user/user.h"
 #include "kernel/fcntl.h"
@@ -142,6 +143,32 @@ getcmd(char *buf, int nbuf)
   return 0;
 }
 
+// Accept one decimal priority within the system's allowed range.
+static int
+parse_priority(char *input, int *priority)
+{
+  int value = 0;
+
+  while (*input == ' ' || *input == '\t')
+    input++;
+  if (*input < '0' || *input > '9')
+    return -1;
+
+  while (*input >= '0' && *input <= '9') {
+    value = value * 10 + *input - '0';
+    if (value > MAXPRIORITY)
+      return -1;
+    input++;
+  }
+  while (*input == ' ' || *input == '\t')
+    input++;
+  if (*input != '\n' && *input != 0)
+    return -1;
+
+  *priority = value;
+  return 0;
+}
+
 int
 main(void)
 {
@@ -163,7 +190,27 @@ main(void)
       cmd++;
     if (*cmd == '\n') // is a blank command
       continue;
-    if (cmd[0] == 'c' && cmd[1] == 'd' && cmd[2] == ' ') {
+    if (memcmp(cmd, "getpriority", 11) == 0 &&
+        (cmd[11] == ' ' || cmd[11] == '\t' ||
+         cmd[11] == '\n' || cmd[11] == 0)) {
+      char *argument = cmd + 11;
+      while (*argument == ' ' || *argument == '\t')
+        argument++;
+      if (*argument != '\n' && *argument != 0)
+        fprintf(2, "usage: getpriority\n");
+      else
+        printf("priority: %d\n", getpriority());
+    } else if (memcmp(cmd, "setpriority", 11) == 0 &&
+               (cmd[11] == ' ' || cmd[11] == '\t' ||
+                cmd[11] == '\n' || cmd[11] == 0)) {
+      int value;
+      if (parse_priority(cmd + 11, &value) < 0)
+        fprintf(2, "usage: setpriority <0-49>\n");
+      else if (setpriority(value) < 0)
+        fprintf(2, "setpriority: failed\n");
+      else
+        printf("priority set to %d\n", getpriority());
+    } else if (cmd[0] == 'c' && cmd[1] == 'd' && cmd[2] == ' ') {
       // Chdir must be called by the parent, not the child.
       cmd[strlen(cmd) - 1] = 0; // chop \n
       if (chdir(cmd + 3) < 0)
