@@ -488,13 +488,29 @@ kwait2(uint64 status_addr, uint64 rusage_addr)
   }
 }
 
-// Per-CPU process scheduler.
-// Each CPU calls scheduler() after setting itself up.
-// Scheduler never returns.  It loops, doing:
-//  - choose a process to run.
-//  - swtch to start running that process.
-//  - eventually that process transfers control
-//    via swtch back to the scheduler.
+// Run one process while preserving the existing context-switch protocol.
+static int
+run_runnable(struct proc *p, struct cpu *c)
+{
+  acquire(&p->lock);
+  if (p->state != RUNNABLE) {
+    release(&p->lock);
+    return 0;
+  }
+
+  // The process releases its lock when it resumes and holds it on return.
+  p->state = RUNNING;
+  c->proc = p;
+  swtch(&c->context, &p->context);
+
+  // Restore scheduler state after the process yields or sleeps.
+  mycpu()->intena = 0;
+  c->proc = 0;
+  release(&p->lock);
+  return 1;
+}
+
+// Select runnable processes using the configured scheduling policy.
 void
 scheduler(void)
 {
@@ -503,39 +519,38 @@ scheduler(void)
 
   c->proc = 0;
   for (;;) {
-    // The most recent process to run may have had interrupts
-    // turned off; enable them to avoid a deadlock if all
-    // processes are waiting. Then turn them back off
-    // to avoid a possible race between an interrupt
-    // and wfi.
+    // Permit pending interrupts, then keep selection stable on one CPU.
     intr_on();
     intr_off();
 
     int found = 0;
+#if SCHED_POLICY == SCHED_PRIORITY
+    struct proc *best = 0;
+    int bestpriority = MINPRIORITY - 1;
+
+    // Inspect each candidate while holding its process lock.
     for (p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if (p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
-
-        // Don't re-enable interrupts on release.
-        mycpu()->intena = 0;
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-        found = 1;
+      if (p->state == RUNNABLE && p->priority > bestpriority) {
+        best = p;
+        bestpriority = p->priority;
       }
       release(&p->lock);
     }
-    if (found == 0) {
-      // nothing to run; stop running on this core until an interrupt.
-      asm volatile("wfi");
+    if (best != 0)
+      found = run_runnable(best, c);
+#elif SCHED_POLICY == SCHED_RR
+    // Preserve the original table-order round-robin pass.
+    for (p = proc; p < &proc[NPROC]; p++) {
+      if (run_runnable(p, c))
+        found = 1;
     }
+#else
+#error Unsupported scheduler policy
+#endif
+
+    if (found == 0)
+      asm volatile("wfi");
   }
 }
 
