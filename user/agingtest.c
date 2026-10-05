@@ -4,6 +4,7 @@
 
 struct timing {
   char label;
+  int priority;
   uint started;
   uint finished;
 };
@@ -23,12 +24,14 @@ worker(int priority, char label, int readyfd, int gofd, int resultfd)
   char token = 'R';
   struct timing result;
 
-  if (setpriority(priority) != 0 ||
-      write(readyfd, &token, 1) != 1 ||
+  if (priority >= 0 && setpriority(priority) != 0)
+    fail("worker priority");
+  if (write(readyfd, &token, 1) != 1 ||
       read(gofd, &token, 1) != 1)
     fail("worker setup");
 
   result.label = label;
+  result.priority = getpriority();
   result.started = uptime();
   if (label == 'H') {
     // Keep the high-priority worker runnable for 120 clock ticks.
@@ -43,7 +46,7 @@ worker(int priority, char label, int readyfd, int gofd, int resultfd)
 }
 
 int
-main(void)
+main(int argc, char *argv[])
 {
   int ready[2], go[2], results[2];
   int lowpid, highpid, status;
@@ -52,6 +55,13 @@ main(void)
   struct timing first, second, low, high;
   uint released, lowresponse, highresponse;
   uint lowturnaround, highturnaround;
+  int lowpriority = 0;
+
+  // Preserve the shell's inherited priority when requested.
+  if (argc == 2 && strcmp(argv[1], "inherit") == 0)
+    lowpriority = -1;
+  else if (argc != 1)
+    fail("usage: agingtest [inherit]");
 
   if (pipe(ready) < 0 || pipe(go) < 0 || pipe(results) < 0)
     fail("pipe setup");
@@ -61,7 +71,7 @@ main(void)
   if (lowpid < 0)
     fail("low-priority fork");
   if (lowpid == 0)
-    worker(0, 'L', ready[1], go[0], results[1]);
+    worker(lowpriority, 'L', ready[1], go[0], results[1]);
 
   highpid = fork();
   if (highpid < 0)
@@ -101,6 +111,7 @@ main(void)
 
   printf("policy: %s\n",
          SCHED_POLICY == SCHED_AGING ? "aging" : "priority");
+  printf("low base priority: %d\n", low.priority);
   printf("low: response %u, turnaround %u ticks\n",
          lowresponse, lowturnaround);
   printf("high: response %u, turnaround %u ticks\n",
